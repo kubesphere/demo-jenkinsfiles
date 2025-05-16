@@ -1,0 +1,62 @@
+pipeline {
+  agent {
+    node {
+      label 'base'
+    }
+  }
+
+  environment {
+    GO111MODULE = 'on'
+  }
+
+  stages {
+
+    stage('Clone Repository') {
+      steps {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: 'master']],
+          extensions: [[
+            $class: 'CloneOption',
+            depth: 1,
+            shallow: true
+          ]],
+          userRemoteConfigs: [[
+            url: 'https://github.com/kubesphere-sigs/demo-go-http'
+          ]]
+        ])
+      }
+    }
+
+    stage('Download Dependencies') {
+      steps {
+        container('base') {
+          sh 'go mod download'
+        }
+      }
+    }
+
+    stage('Run Tests') {
+      steps {
+        container('base') {
+          sh 'go test ./... -v'
+        }
+      }
+    }
+
+    stage('Build Binary') {
+      steps {
+        container('base') {
+          sh 'go build -o service main.go'
+        }
+      }
+    }
+
+    stage('Archive Artifacts') {
+      steps {
+        archiveArtifacts artifacts: 'service', followSymlinks: false
+      }
+    }
+
+  }
+}

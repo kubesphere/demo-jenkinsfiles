@@ -1,0 +1,58 @@
+pipeline {
+  agent {
+    node {
+      label 'base'
+    }
+  }
+
+  stages {
+
+    stage('Clone Repository') {
+      steps {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: 'main']],
+          extensions: [[
+            $class: 'CloneOption',
+            depth: 1,
+            shallow: true
+          ]],
+          userRemoteConfigs: [[
+            url: 'https://github.com/kubesphere/java-21-maven-project'
+          ]]
+        ])
+      }
+    }
+
+    stage('Run Compile') {
+      steps {
+        container('base') {
+          sh 'mvn compile'
+        }
+      }
+    }
+
+    stage('Run Test') {
+      steps {
+        container('base') {
+          sh 'mvn clean test'
+        }
+      }
+    }
+
+    stage('Run Build') {
+      steps {
+        container('base') {
+          sh 'mvn package'
+        }
+      }
+    }
+
+    stage('Archive Artifacts') {
+      steps {
+        archiveArtifacts artifacts: 'target/*.jar', followSymlinks: false
+      }
+    }
+
+  }
+}

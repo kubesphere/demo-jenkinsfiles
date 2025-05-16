@@ -1,0 +1,61 @@
+pipeline {
+  agent {
+    node {
+      label 'base'
+    }
+  }
+
+  stages {
+
+    stage('Clone Repository') {
+      steps {
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: 'master']],
+          extensions: [[
+            $class: 'CloneOption',
+            depth: 1,
+            shallow: true
+          ]],
+          userRemoteConfigs: [[
+            url: 'https://github.com/kubesphere-sigs/demo-javascript'
+          ]]
+        ])
+      }
+    }
+
+    stage('Run npm install') {
+      steps {
+        container('base') {
+          sh 'npm install'
+        }
+      }
+    }
+
+    stage('Run Test') {
+      steps {
+        container('base') {
+          sh 'npm run test'
+        }
+      }
+    }
+
+    stage('Run Build') {
+      steps {
+        container('base') {
+          sh 'npm run build'
+        }
+      }
+    }
+
+    stage('Archive Artifacts') {
+      steps {
+        container('base') {
+          sh 'zip -r dist.zip dist/'
+        }
+        archiveArtifacts artifacts: 'dist.zip', followSymlinks: false
+      }
+    }
+
+  }
+}
