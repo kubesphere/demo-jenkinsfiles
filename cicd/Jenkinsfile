@@ -1,0 +1,134 @@
+pipeline {
+  agent {
+    node {
+      label 'base'
+    }
+  }
+
+  environment {
+    DOCKER_CREDENTIAL_ID     = 'your-dockerhub-credential-id'
+    KUBECONFIG_CREDENTIAL_ID = 'your-kubeconfig-credential-id'
+    REGISTRY                 = 'docker.io'
+    DOCKERHUB_NAMESPACE      = 'your-dockerhub-namespace'
+    APP_NAME                 = 'your-dockerhub-repository-name'
+    BRANCH_NAME              = 'main'
+  }
+
+  parameters {
+    string(name: 'TAG_NAME', defaultValue: 'latest', description: 'Target image tag')
+  }
+
+  stages {
+
+    stage('Init') {
+      steps {
+        script {
+          env.TAG_NAME = params.TAG_NAME
+        }
+      }
+    }
+
+    stage('Clone Code') {
+      steps {
+        container('base') {
+          checkout([
+            $class: 'GitSCM',
+            branches: [[name: "$BRANCH_NAME"]],
+            doGenerateSubmoduleConfigurations: false,
+            extensions: [],
+            submoduleCfg: [],
+            userRemoteConfigs: [[
+              url: 'https://github.com/kubesphere/java-21-maven-project.git'
+            ]]
+          ])
+        }
+      }
+    }
+
+    stage('Unit Test') {
+      steps {
+        container('base') {
+          sh 'mvn clean test'
+        }
+      }
+    }
+
+    stage('Build & Push') {
+      steps {
+        container('base') {
+          withCredentials([
+            usernamePassword(
+              credentialsId: "$DOCKER_CREDENTIAL_ID",
+              usernameVariable: 'DOCKER_USERNAME',
+              passwordVariable: 'DOCKER_PASSWORD'
+            )
+          ]) {
+            sh '''
+              mvn clean package
+
+              docker build -f Dockerfile-online \
+                -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .
+
+              echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin
+
+              docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER
+
+              docker tag \
+                $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER \
+                $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$TAG_NAME
+
+              docker push $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:$TAG_NAME
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Deploy to Dev') {
+      steps {
+        container('base') {
+          input(id: 'deploy-to-dev', message: 'Deploy to dev?')
+
+          withCredentials([
+            string(
+              credentialsId: "$KUBECONFIG_CREDENTIAL_ID",
+              variable: 'KUBECONFIG_CONFIG'
+            )
+          ]) {
+            sh '''
+              mkdir -p ~/.kube/
+              echo "$KUBECONFIG_CONFIG" | base64 -d > ~/.kube/config
+              chmod 600 ~/.kube/config
+
+              envsubst < deploy/dev-ol/devops-sample.yaml | kubectl apply -f -
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Deploy to Production') {
+      steps {
+        container('base') {
+          input(id: 'deploy-to-production', message: 'Deploy to production?')
+
+          withCredentials([
+            string(
+              credentialsId: "$KUBECONFIG_CREDENTIAL_ID",
+              variable: 'KUBECONFIG_CONFIG'
+            )
+          ]) {
+            sh '''
+              mkdir -p ~/.kube/
+              echo "$KUBECONFIG_CONFIG" | base64 -d > ~/.kube/config
+              chmod 600 ~/.kube/config
+
+              envsubst < deploy/prod-ol/devops-sample.yaml | kubectl apply -f -
+            '''
+          }
+        }
+      }
+    }
+  }
+}
+
