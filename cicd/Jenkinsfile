@@ -97,7 +97,7 @@ pipeline {
           ]) {
             sh '''
               mkdir -p ~/.kube/
-              echo "$KUBECONFIG_CONFIG" | base64 -d > ~/.kube/config
+              printf "%s" "$KUBECONFIG_CONFIG" > ~/.kube/config
               chmod 600 ~/.kube/config
 
               envsubst < deploy/dev-ol/devops-sample.yaml | kubectl apply -f -
@@ -120,7 +120,7 @@ pipeline {
           ]) {
             sh '''
               mkdir -p ~/.kube/
-              echo "$KUBECONFIG_CONFIG" | base64 -d > ~/.kube/config
+              printf "%s" "$KUBECONFIG_CONFIG" > ~/.kube/config
               chmod 600 ~/.kube/config
 
               envsubst < deploy/prod-ol/devops-sample.yaml | kubectl apply -f -
