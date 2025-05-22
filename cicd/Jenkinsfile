@@ -96,11 +96,8 @@ pipeline {
             )
           ]) {
             sh '''
-              mkdir -p ~/.kube/
-              printf "%s" "$KUBECONFIG_CONFIG" > ~/.kube/config
-              chmod 600 ~/.kube/config
-
-              envsubst < deploy/dev-ol/devops-sample.yaml | kubectl apply -f -
+              printf "%s" "$KUBECONFIG_CONFIG" > kubeconfig
+              envsubst < deploy/dev-ol/devops-sample.yaml | kubectl --kubeconfig=kubeconfig apply -f -
             '''
           }
         }
