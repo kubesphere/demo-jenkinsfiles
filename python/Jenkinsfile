@@ -10,7 +10,7 @@ pipeline {
     REGISTRY                 = 'docker.io'
     DOCKERHUB_NAMESPACE      = 'your-dockerhub-namespace'
     APP_NAME                 = 'your-dockerhub-repository-name'
-    BRANCH_NAME              = 'main'
+    BRANCH_NAME              = 'master'
   }
 
   parameters {
@@ -37,7 +37,7 @@ pipeline {
             extensions: [],
             submoduleCfg: [],
             userRemoteConfigs: [[
-              url: 'https://github.com/kubesphere/java-21-maven-project.git'
+              url: 'https://github.com/kubesphere/devops-python-sample.git'
             ]]
           ])
         }
@@ -47,7 +47,7 @@ pipeline {
     stage('Unit Test') {
       steps {
         container('base') {
-          sh 'mvn clean test'
+          sh 'PORT=18080 make test'
         }
       }
     }
@@ -63,9 +63,9 @@ pipeline {
             )
           ]) {
             sh '''
-              mvn clean package
+              make build
 
-              docker build -f Dockerfile-online \
+              docker build -f Dockerfile \
                 -t $REGISTRY/$DOCKERHUB_NAMESPACE/$APP_NAME:SNAPSHOT-$BRANCH_NAME-$BUILD_NUMBER .
 
               echo "$DOCKER_PASSWORD" | docker login $REGISTRY -u "$DOCKER_USERNAME" --password-stdin
